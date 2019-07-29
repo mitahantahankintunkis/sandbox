@@ -43,13 +43,32 @@ let curProgram;
 
 
 
+function resize() {
+    let rect = canvas.getBoundingClientRect();
+    let oldSize = {
+        width: canvas.width,
+        height: canvas.height,
+    };
+
+    canvas.width  = rect.width;
+    canvas.height = rect.height;
+
+    // Telling the program that the screen has been resized
+    if (curProgram && typeof curProgram.canvasResized === "function") {
+        curProgram.canvasResized(oldSize, rect);
+    }
+}
+
+
 function hashChange() {
     let hash = window.location.hash.toLowerCase();
 
+    // Stopping the current program
     if (curProgram) {
         curProgram.stop();
     }
 
+    // Switching programs
     if (hashes.hasOwnProperty(hash)) {
         $("canvas").show();
         $(".about").hide();
@@ -62,8 +81,12 @@ function hashChange() {
     }
 }
 
+// Events
 window.onhashchange = hashChange;
 window.onload       = hashChange;
+
+window.addEventListener("resize", function() { resize(); });
+resize();
 
 canvas.addEventListener("mousemove", function(event) {
     let rect = canvas.getBoundingClientRect();
