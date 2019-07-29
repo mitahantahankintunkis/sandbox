@@ -1,5 +1,5 @@
 // Cloth simulation using verlet integration
-import { Vec2, Vec3 } from "./mathutils.js";
+import { Vec3 } from "./mathutils.js";
 
 
 let handle;
@@ -14,7 +14,8 @@ let dragged     = null;
 
 
 
-function updateVertices(mouseState) {
+// Adds physics to vertices
+function updateVertices() {
     for (let v of vertices) {
         if (v.fixed) continue;
 
@@ -25,38 +26,38 @@ function updateVertices(mouseState) {
         v.pos.add(vel);
         v.pos.y += gravity;
     }
-
-    // Mouse
-    if (!mouseState.inCanvas || !mouseState.down) {
-        dragged = null;
-    }
-
-    if (!dragged && mouseState.inCanvas && mouseState.down) {
-        dragged = vertices[0];
-        let closestPos = new Vec2(dragged.pos.x, dragged.pos.y);
-
-        for (let v of vertices) {
-            let curPos = new Vec2(v.pos.x, v.pos.y);
-
-            if (curPos.distSqr(mouseState.pos) < closestPos.distSqr(mouseState.pos)) {
-                dragged = v;
-                closestPos = curPos;
-            }
-        }
-
-        if (closestPos.distSqr(mouseState.pos) > 2500) {
-            dragged = null;
-        }
-    }
 }
 
-function updateBones(mouseState) {
+
+// Drags the vertex closest to the mouse
+function drag(mouseState) {
+    if (!mouseState.inCanvas || !mouseState.down) {
+        dragged = null;
+        return;
+    }
+
     if (dragged) {
         dragged.pos.x = mouseState.pos.x;
         dragged.pos.y = mouseState.pos.y;
         dragged.oldPos.z -= 1;
+        return;
     }
 
+    if (mouseState.inCanvas && mouseState.down) {
+        let m = mouseState.pos;
+        dragged = vertices.reduce(
+            (a, c) => c.pos.asVec2().distSqr(m) < a.pos.asVec2().distSqr(m) ? c : a
+        );
+
+        if (dragged.pos.asVec2().distSqr(m) > 2500) {
+            dragged = null;
+            return;
+        }
+    }
+}
+
+
+function updateBones() {
     for (let i = 0; i < bones.length; ++i) {
         let b = bones[i];
 
@@ -65,77 +66,73 @@ function updateBones(mouseState) {
 
         let dist  = b.v0.pos.dist(b.v1.pos);
         let delta = b.len - dist;
+        let percentage = delta / dist / 2;
+        let offset = Vec3.delta(b.v0.pos, b.v1.pos);
+
+        offset.scl(percentage);
 
         // Breaking bones
-        if (dist > bones[i].len * 4 && !bones[i].v0.fixed && !bones[i].v1.fixed) {
+        if (dist > b.len * 4 && !b.v0.fixed && !b.v1.fixed) {
             delete bones[i];
             continue;
         }
 
-        let percentage = delta / dist / 2;
-
-        if (b.v0.fixed || b.v1.fixed) {
-            percentage *= 2;
-        }
-
-        let offsetX = (b.v1.pos.x - b.v0.pos.x) * percentage;
-        let offsetY = (b.v1.pos.y - b.v0.pos.y) * percentage;
-        let offsetZ = (b.v1.pos.z - b.v0.pos.z) * percentage;
-
-        if (!b.v0.fixed) {
-            b.v0.pos.x -= offsetX;
-            b.v0.pos.y -= offsetY;
-            b.v0.pos.z -= offsetZ;
-        }
-        if (!b.v1.fixed) {
-            b.v1.pos.x += offsetX;
-            b.v1.pos.y += offsetY;
-            b.v1.pos.z += offsetZ;
-        }
+        if (b.v0.fixed || b.v1.fixed) offset.scl(2);
+        if (!b.v0.fixed) b.v0.pos.sub(offset);
+        if (!b.v1.fixed) b.v1.pos.add(offset);
     }
 }
 
 
+// Updates the cloth and draws it
 function draw(ctx, mouseState) {
-    updateVertices(mouseState);
-    for (let i = 0; i < 20; ++i) updateBones(mouseState);
+    updateVertices();
+
+    for (let i = 0; i < 20; ++i) {
+        drag(mouseState);
+        updateBones();
+    }
 
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     let totalHeight = ctx.canvas.height - padding*2;
+    ctx.lineWidth = 1;
 
-    for (let v of vertices) {
-        let alpha     = ((v.pos.z + totalHeight) / (totalHeight*2)) * 255;
-        ctx.fillStyle = `rgba(${alpha}, ${alpha / 2}, 64, 255)`;
+    let bonesSorted = bones.slice();
+    bonesSorted.sort(function(a, b) {
+        return a.v0.pos.z - b.v0.pos.z;
+    });
 
-        ctx.beginPath();
-        ctx.arc(v.pos.x, v.pos.y, 2, 0, Math.PI*2);
-        ctx.fill();
-    }
-
-    for (let b of bones) {
+    for (let b of bonesSorted) {
         if (!b) continue;
         let alpha       = ((b.v0.pos.z + totalHeight) / (totalHeight*2)) * 255;
-        ctx.strokeStyle = `rgba(${alpha}, ${alpha / 2}, 64, 255)`;
+        ctx.strokeStyle = `rgba(${alpha}, ${alpha / 2}, 64, ${alpha / 64})`;
 
         ctx.beginPath();
-        ctx.moveTo(b.v0.pos.x, b.v0.pos.y);
-        ctx.lineTo(b.v1.pos.x, b.v1.pos.y);
+        ctx.moveTo(Math.floor(b.v0.pos.x), Math.floor(b.v0.pos.y));
+        ctx.lineTo(Math.floor(b.v1.pos.x), Math.floor(b.v1.pos.y));
         ctx.stroke();
     }
 }
 
 
-function resize(ctx) {
-    let rect = ctx.canvas.getBoundingClientRect();
-    ctx.canvas.width  = rect.width;
-    ctx.canvas.height = rect.height;
+// Scales the cloth based on the canvas x-axis. Not perfect, but
+// works for a couple of small/slow resizes.
+export function canvasResized(oldSize, newSize) {
+    let sx = newSize.width / oldSize.width;
+
+    for (let vert of vertices) {
+        vert.pos.scl(sx);
+        vert.oldPos.scl(sx);
+    }
+
+    for (let bone of bones) {
+        bone.len *= sx;
+    }
 }
 
 
+// Deletes the old cloth and generates a new one.
 export function start(ctx, mouseState) {
-    window.addEventListener("resize", function() { resize(ctx); });
-    resize(ctx);
-
     vertices = [];
     bones    = [];
 
@@ -157,7 +154,7 @@ export function start(ctx, mouseState) {
     let deltas = [[0, 1], [1, 0], [1, 1], [1, -1]];
     for (let y = 0; y < height; ++y) {
         for (let x = 0; x < width; ++x) {
-            const v0 = vertices[(y + 0)*width + (x + 0)];
+            const v0 = vertices[y*width + x];
 
             for (let d of deltas) {
                 if (x + d[0] >= width || y + d[1] >= height) continue;

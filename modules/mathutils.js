@@ -131,6 +131,10 @@ class Vec3 {
         return Math.sqrt(dx*dx + dy*dy + dz*dz);
     }
 
+    asVec2() {
+        return new Vec2(this.x, this.y);
+    }
+
     static delta(v0, v1) {
         return new Vec3(v1.x - v0.x, v1.y - v0.y, v1.z - v0.z);
     }
@@ -142,6 +146,13 @@ export function shuffle(arr) {
         let j = Math.floor(Math.random() * arr.length);
         [arr[i], arr[j]] = [arr[j], arr[i]];
     }
+
+    return arr;
+}
+
+
+export function lerp(a, b, t) {
+    return a * (1.0 - t) + b * t;
 }
 
 
@@ -159,6 +170,12 @@ export function lerpColor(a, b, amount) {
         const rb = ab + amount * (bb - ab);
 
         return (rr << 16) + (rg << 8) + (rb | 0);
+}
+
+export function hexToCol(hex) {
+    const s = hex.toString(16);
+    const p = "0".repeat(6 - s.length);
+    return "#" + p + s;
 }
 
 export { Vec2, Vec3 };
