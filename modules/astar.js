@@ -1,10 +1,12 @@
 import * as Maze from "./maze.js";
 
 let handle;
+const colSearch = 0x55ccdd;
+const colPath   = 0xff9933;
 
 
 function draw(maze, ctx) {
-    Maze.draw(2, maze, ctx);
+    Maze.draw(1, maze, ctx);
 }
 
 
@@ -35,7 +37,7 @@ export function start(ctx) {
     resize(ctx);
 
     //let maze = Maze.create(100, 200);
-    let maze = Maze.create(50, 80);
+    let maze = Maze.create(100, 150);
 
     const stepSize = 15;
     const f = function(node) { return node.toStart + node.toEnd; };
@@ -58,7 +60,7 @@ export function start(ctx) {
         if (reachedEnd) {
             if (!minNode.parent) return;
 
-            maze.matrix[minNode.y][minNode.x] = 2;
+            maze.matrix[minNode.y][minNode.x] = colPath;
 
             minNode = minNode.parent;
 
@@ -85,7 +87,7 @@ export function start(ctx) {
             for (let n of neighbors) {
                 let newPos = { x: minNode.x + n.dx, y: minNode.y + n.dy };
                 if (!inBounds(newPos.x, newPos.y, maze)) continue;
-                if (maze.matrix[newPos.y][newPos.x] === 0 || visited.has(nodeHash(newPos))) continue;
+                if (maze.matrix[newPos.y][newPos.x] === Maze.colors.wall || visited.has(nodeHash(newPos))) continue;
 
                 let newNode = {
                     toStart: minNode.toStart + 1,
@@ -114,7 +116,7 @@ export function start(ctx) {
                 }
             }
 
-            maze.matrix[minNode.y][minNode.x] = 3;
+            maze.matrix[minNode.y][minNode.x] = colSearch;
         }
 
         draw(maze, ctx);

@@ -146,6 +146,8 @@ export function shuffle(arr) {
         let j = Math.floor(Math.random() * arr.length);
         [arr[i], arr[j]] = [arr[j], arr[i]];
     }
+
+    return arr;
 }
 
 
@@ -168,6 +170,12 @@ export function lerpColor(a, b, amount) {
         const rb = ab + amount * (bb - ab);
 
         return (rr << 16) + (rg << 8) + (rb | 0);
+}
+
+export function hexToCol(hex) {
+    const s = hex.toString(16);
+    const p = "0".repeat(6 - s.length);
+    return "#" + p + s;
 }
 
 export { Vec2, Vec3 };
